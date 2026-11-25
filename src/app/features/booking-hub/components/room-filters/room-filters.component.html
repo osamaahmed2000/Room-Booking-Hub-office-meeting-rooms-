@@ -1,0 +1,66 @@
+<section class="filters-bar" aria-label="Room filters">
+  <div class="filter-field filter-search">
+    <label for="room-search">Search rooms</label>
+    <input
+      id="room-search"
+      type="search"
+      placeholder="Room name..."
+      [value]="store.filters().searchQuery"
+      (input)="onSearchInput($event)"
+    />
+  </div>
+
+  <div class="filter-field">
+    <label for="filter-floor">Floor</label>
+    <select
+      id="filter-floor"
+      [value]="store.filters().floor ?? ''"
+      (change)="onFloorChange($event)"
+    >
+      <option value="">All floors</option>
+      @for (floor of floors(); track floor) {
+        <option [value]="floor">Floor {{ floor }}</option>
+      }
+    </select>
+  </div>
+
+  <div class="filter-field">
+    <label for="filter-capacity">Min capacity</label>
+    <select
+      id="filter-capacity"
+      [value]="store.filters().minCapacity ?? ''"
+      (change)="onCapacityChange($event)"
+    >
+      <option value="">Any size</option>
+      <option value="4">4+ people</option>
+      <option value="6">6+ people</option>
+      <option value="10">10+ people</option>
+      <option value="12">12+ people</option>
+    </select>
+  </div>
+
+  <fieldset class="equipment-group">
+    <legend class="sr-only">Required equipment</legend>
+    <span class="group-label" aria-hidden="true">Equipment</span>
+    <div class="equipment-pills">
+      @for (opt of equipmentOptions; track opt.value) {
+        <button
+          type="button"
+          class="pill-btn"
+          [class.active]="isEquipmentSelected(opt.value)"
+          [attr.aria-pressed]="isEquipmentSelected(opt.value)"
+          (click)="toggleEquipment(opt.value)"
+        >
+          {{ opt.label }}
+        </button>
+      }
+    </div>
+  </fieldset>
+
+  @if (hasActiveFilters()) {
+    <button type="button" class="btn clear-btn" (click)="clearFilters()">
+      Clear
+    </button>
+  }
+</section>
+

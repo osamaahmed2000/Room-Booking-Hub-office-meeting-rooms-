@@ -1,0 +1,43 @@
+<section class="rooms-page" aria-labelledby="rooms-heading">
+  <header class="page-header">
+    <div>
+      <h1 id="rooms-heading">Office Meeting Rooms</h1>
+      <p class="subtitle">Browse rooms by floor, capacity, and installed equipment.</p>
+    </div>
+  </header>
+
+  <app-room-filters />
+
+  @if (store.availableRooms().length === 0) {
+    <div class="empty-card">
+      <h2>No rooms match your criteria</h2>
+      <p>Adjust your filters to see matching meeting rooms.</p>
+    </div>
+  } @else {
+    <div class="rooms-grid">
+      @for (room of store.availableRooms(); track room.id) {
+        <article class="room-card">
+          <div class="room-header">
+            <h2>{{ room.name }}</h2>
+            <span class="badge">Floor {{ room.floor }}</span>
+          </div>
+          <p class="capacity">Capacity: {{ room.capacity }} attendees</p>
+          <div class="equipment-tags" aria-label="Room equipment">
+            @for (eq of room.equipment; track eq) {
+              <span class="badge">{{ eq }}</span>
+            }
+          </div>
+          <button
+            type="button"
+            class="btn btn-primary"
+            [disabled]="!store.canCreateBooking()"
+            (click)="bookRoomRequested.emit({ roomId: room.id })"
+          >
+            Book {{ room.name }}
+          </button>
+        </article>
+      }
+    </div>
+  }
+</section>
+
