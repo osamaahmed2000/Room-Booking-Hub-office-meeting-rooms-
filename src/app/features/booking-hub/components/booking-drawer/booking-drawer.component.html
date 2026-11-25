@@ -130,12 +130,12 @@
             id="bk-weeks"
             name="recurringWeeks"
             [ngModel]="recurringWeeks()"
-            (ngModelChange)="recurringWeeks.set($event)"
+            (ngModelChange)="recurringWeeks.set(+$event)"
           >
-            <option [value]="1">Single booking (1 week)</option>
-            <option [value]="2">Weekly for 2 weeks</option>
-            <option [value]="3">Weekly for 3 weeks</option>
-            <option [value]="4">Weekly for 4 weeks</option>
+            <option value="1">Single booking (1 week)</option>
+            <option value="2">Weekly for 2 weeks</option>
+            <option value="3">Weekly for 3 weeks</option>
+            <option value="4">Weekly for 4 weeks</option>
           </select>
         </div>
 

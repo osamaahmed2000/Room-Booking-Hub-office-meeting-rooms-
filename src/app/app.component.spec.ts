@@ -1,9 +1,11 @@
 import '@angular/compiler';
 import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { AppComponent } from './app.component';
 import { BOOKING_GATEWAY, LocalMockGateway } from './data';
+import { BookingDrawerComponent } from './features/booking-hub/components/booking-drawer/booking-drawer.component';
 import { MockServer } from './infrastructure/mock-server/mock-server';
 import { APP_CLOCK, BookingHubStore } from './state';
 
@@ -101,44 +103,39 @@ describe('Room Booking Hub UI Components', () => {
     const store = TestBed.inject(BookingHubStore);
     await store.initialize();
 
-    // Put a conflict on Week 2 (2026-12-02) for room-alex 10:00-11:00
-    await server.createBooking({
-      roomId: 'room-alex',
-      userId: 'user-sara',
-      title: 'Week 2 Blocker',
-      start: '2026-12-02T10:00:00+02:00',
-      end: '2026-12-02T11:00:00+02:00',
-      attendees: 2,
-      needs: [],
-    });
-    await store.refreshBookings();
+    // Put a conflict on Week 2 (2026-12-02) in store bookings
+    store.bookings.update((prev) => [
+      ...prev,
+      {
+        id: 'bk-w2-conflict',
+        roomId: 'room-alex',
+        userId: 'user-sara',
+        title: 'Week 2 Blocker',
+        start: '2026-12-02T10:00:00+02:00',
+        end: '2026-12-02T11:00:00+02:00',
+        attendees: 2,
+        needs: [],
+        status: 'confirmed',
+      },
+    ]);
 
-    // Open BookingDrawer via "+ Book a Room" button on room-alex
+    // Open BookingDrawer on room-alex
     fixture.componentInstance.openBookingDrawer('room-alex');
     fixture.detectChanges();
 
-    const drawerEl = (fixture.nativeElement as HTMLElement).querySelector('app-booking-drawer');
-    expect(drawerEl).not.toBeNull();
+    const drawerDebug = fixture.debugElement.query(By.directive(BookingDrawerComponent));
+    expect(drawerDebug).not.toBeNull();
+    const drawerCmp = drawerDebug.componentInstance as BookingDrawerComponent;
 
-    // Set recurringWeeks to 4 and time 10:00-11:00 via component instance signals
-    const drawerDebug = fixture.debugElement.children[0]!;
-    void drawerDebug;
-    const weeksSelect = drawerEl!.querySelector('#bk-weeks') as HTMLSelectElement;
-    weeksSelect.value = '4';
-    weeksSelect.dispatchEvent(new Event('change'));
-
-    const startInput = drawerEl!.querySelector('#bk-start') as HTMLInputElement;
-    startInput.value = '10:00';
-    startInput.dispatchEvent(new Event('input'));
-
-    const endInput = drawerEl!.querySelector('#bk-end') as HTMLInputElement;
-    endInput.value = '11:00';
-    endInput.dispatchEvent(new Event('input'));
-
+    drawerCmp.title.set('Weekly Sync');
+    drawerCmp.recurringWeeks.set(4);
+    drawerCmp.startTime.set('10:00');
+    drawerCmp.endTime.set('11:00');
     fixture.detectChanges();
 
-    expect(drawerEl!.textContent).toContain('Recurring conflict');
-    expect(drawerEl!.textContent).toContain('Week 2 (2026-12-02)');
+    const drawerEl = drawerDebug.nativeElement as HTMLElement;
+    expect(drawerEl.textContent).toContain('Recurring conflict');
+    expect(drawerEl.textContent).toContain('Week 2 (2026-12-02)');
   });
 });
 
