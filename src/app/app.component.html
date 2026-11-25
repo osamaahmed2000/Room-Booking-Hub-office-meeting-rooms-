@@ -1,0 +1,170 @@
+<div class="app-shell">
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">RB</div>
+      <div>
+        <span class="brand-name">Room Booking Hub</span>
+        <span class="brand-sub">Cairo Office</span>
+      </div>
+    </div>
+
+    <div class="topbar-context">
+      <span class="badge">{{ store.selectedDate() }} · Africa/Cairo</span>
+      <span class="badge">
+        Quota: {{ store.bookingCounts().myActiveOnSelectedDate }}/{{ store.bookingCounts().quotaLimit }}
+      </span>
+      <div class="user-chip" aria-label="Signed in user">
+        <span class="avatar" aria-hidden="true">OA</span>
+        <span class="user-name">{{ store.currentUserId() }}</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="shell-body">
+    <nav class="sidebar" aria-label="Primary navigation">
+      <button
+        type="button"
+        class="nav-item"
+        [class.active]="activeSection() === 'timeline'"
+        [attr.aria-current]="activeSection() === 'timeline' ? 'page' : null"
+        (click)="setSection('timeline')"
+      >
+        Day Timeline
+      </button>
+      <button
+        type="button"
+        class="nav-item"
+        [class.active]="activeSection() === 'my-bookings'"
+        [attr.aria-current]="activeSection() === 'my-bookings' ? 'page' : null"
+        (click)="setSection('my-bookings')"
+      >
+        <span>My Bookings</span>
+        <span class="badge">{{ store.myBookings().length }}</span>
+      </button>
+      <button
+        type="button"
+        class="nav-item"
+        [class.active]="activeSection() === 'rooms'"
+        [attr.aria-current]="activeSection() === 'rooms' ? 'page' : null"
+        (click)="setSection('rooms')"
+      >
+        <span>Rooms</span>
+        <span class="badge">{{ store.rooms().length }}</span>
+      </button>
+    </nav>
+
+    <main class="main-content">
+      @if (store.error(); as err) {
+        <div class="alert-banner alert-error" role="alert">
+          <div>
+            <strong>Request failed:</strong> {{ err.message }}
+          </div>
+          <div class="alert-actions">
+            <button type="button" class="btn" (click)="store.refreshBookings()">Retry</button>
+            <button type="button" class="btn" (click)="store.clearError()">Dismiss</button>
+          </div>
+        </div>
+      }
+
+      @for (pending of store.pendingUndoCancellations(); track pending.booking.id) {
+        <div class="alert-banner alert-warning" role="status" aria-live="polite">
+          <span>Cancelled "{{ pending.booking.title }}".</span>
+          <button
+            type="button"
+            class="btn"
+            (click)="store.undoPendingCancel(pending.booking.id)"
+          >
+            Undo (10s)
+          </button>
+        </div>
+      }
+
+      @if (statusMessage(); as msg) {
+        <div class="alert-banner alert-success" role="status" aria-live="polite">
+          <span>{{ msg }}</span>
+          <button type="button" class="btn" (click)="dismissStatus()">Dismiss</button>
+        </div>
+      }
+
+      @switch (activeSection()) {
+        @case ('timeline') {
+          <app-day-timeline
+            (bookRoomRequested)="openBookingDrawer($event.roomId)"
+            (bookingSelected)="inspectBooking($event)"
+          />
+        }
+        @case ('my-bookings') {
+          <app-my-bookings (bookRoomRequested)="openBookingDrawer()" />
+        }
+        @case ('rooms') {
+          <app-rooms-directory (bookRoomRequested)="openBookingDrawer($event.roomId)" />
+        }
+      }
+    </main>
+  </div>
+
+  @if (store.selectedBooking(); as inspected) {
+    <div class="detail-backdrop" (click)="closeBookingDetail()">
+      <div
+        class="detail-modal"
+        appDialogFocus
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="detail-title"
+        (click)="$event.stopPropagation()"
+      >
+        <header class="detail-header">
+          <h2 id="detail-title">{{ inspected.title }}</h2>
+          <button type="button" class="btn" aria-label="Close details" (click)="closeBookingDetail()">
+            ✕
+          </button>
+        </header>
+        <dl class="detail-list">
+          <div>
+            <dt>Room</dt>
+            <dd>{{ getRoomName(inspected.roomId) }}</dd>
+          </div>
+          <div>
+            <dt>When</dt>
+            <dd>{{ formatBookingWindow(inspected) }}</dd>
+          </div>
+          <div>
+            <dt>Organizer</dt>
+            <dd>{{ inspected.userId }}</dd>
+          </div>
+          <div>
+            <dt>Attendees</dt>
+            <dd>{{ inspected.attendees }}</dd>
+          </div>
+          <div>
+            <dt>Status</dt>
+            <dd>{{ inspected.status }}</dd>
+          </div>
+        </dl>
+        <footer class="detail-footer">
+          @if (inspected.userId === store.currentUserId() && inspected.status === 'confirmed') {
+            <button
+              type="button"
+              class="btn btn-danger"
+              [disabled]="store.cancellingBookingIds().has(inspected.id)"
+              (click)="cancelInspectedBooking(inspected.id)"
+            >
+              Cancel Booking
+            </button>
+          }
+          <button type="button" class="btn" (click)="closeBookingDetail()">Close</button>
+        </footer>
+      </div>
+    </div>
+  }
+
+  <app-booking-drawer
+    [open]="drawerOpen()"
+    [initialRoomId]="drawerRoomId()"
+    (closed)="closeBookingDrawer()"
+    (bookingCreated)="showSuccess($event)"
+  />
+
+  <app-conflict-dialog (bookedAlternative)="showSuccess($event)" />
+</div>
+

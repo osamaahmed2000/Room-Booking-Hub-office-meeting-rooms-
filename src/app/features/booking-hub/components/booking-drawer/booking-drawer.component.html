@@ -1,0 +1,222 @@
+@if (open) {
+  <div class="drawer-backdrop" (click)="!store.submitting() && closed.emit()">
+    <aside
+      class="drawer-panel"
+      appDialogFocus
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="drawer-title"
+      (click)="$event.stopPropagation()"
+    >
+      <header class="drawer-header">
+        <div>
+          <h2 id="drawer-title">Book a Meeting Room</h2>
+          <p class="drawer-subtitle">Cairo hours: 08:00–18:00 Sun–Thu · 08:00–13:00 Fri</p>
+        </div>
+        <button
+          type="button"
+          class="btn"
+          aria-label="Close booking drawer"
+          [disabled]="store.submitting()"
+          (click)="closed.emit()"
+        >
+          ✕
+        </button>
+      </header>
+
+      <form class="drawer-form" (ngSubmit)="submit()" novalidate>
+        <div class="form-field">
+          <label for="bk-title">Meeting title</label>
+          <input
+            id="bk-title"
+            name="title"
+            type="text"
+            required
+            placeholder="e.g. Architecture Sync"
+            [ngModel]="title()"
+            (ngModelChange)="title.set($event)"
+            [attr.aria-invalid]="fieldErrors('title').length > 0"
+            aria-describedby="bk-title-err"
+          />
+          @for (err of fieldErrors('title'); track err.code) {
+            <p id="bk-title-err" class="field-error" role="alert">{{ err.message }}</p>
+          }
+        </div>
+
+        <div class="form-field">
+          <label for="bk-room">Room</label>
+          <select
+            id="bk-room"
+            name="roomId"
+            [ngModel]="roomId()"
+            (ngModelChange)="roomId.set($event)"
+            [attr.aria-invalid]="fieldErrors('roomId').length > 0"
+          >
+            @for (r of store.rooms(); track r.id) {
+              <option [value]="r.id">
+                {{ r.name }} (Fl {{ r.floor }} · {{ r.capacity }} seats)
+              </option>
+            }
+          </select>
+          @if (selectedRoom(); as room) {
+            <p class="helper-text">
+              Capacity: {{ room.capacity }} · Equipment: {{ room.equipment.join(', ') || 'None' }}
+            </p>
+          }
+        </div>
+
+        <div class="form-row">
+          <div class="form-field">
+            <label for="bk-date">Date (Cairo)</label>
+            <input
+              id="bk-date"
+              name="date"
+              type="date"
+              required
+              [ngModel]="date()"
+              (ngModelChange)="date.set($event)"
+            />
+          </div>
+
+          <div class="form-field">
+            <label for="bk-attendees">Attendees</label>
+            <input
+              id="bk-attendees"
+              name="attendees"
+              type="number"
+              min="1"
+              [ngModel]="attendees()"
+              (ngModelChange)="attendees.set($event)"
+              [attr.aria-invalid]="fieldErrors('attendees').length > 0"
+              aria-describedby="bk-att-err"
+            />
+            @for (err of fieldErrors('attendees'); track err.code) {
+              <p id="bk-att-err" class="field-error" role="alert">{{ err.message }}</p>
+            }
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-field">
+            <label for="bk-start">Start time</label>
+            <input
+              id="bk-start"
+              name="startTime"
+              type="time"
+              required
+              [ngModel]="startTime()"
+              (ngModelChange)="startTime.set($event)"
+              [attr.aria-invalid]="fieldErrors('start').length > 0"
+            />
+          </div>
+
+          <div class="form-field">
+            <label for="bk-end">End time</label>
+            <input
+              id="bk-end"
+              name="endTime"
+              type="time"
+              required
+              [ngModel]="endTime()"
+              (ngModelChange)="endTime.set($event)"
+              [attr.aria-invalid]="fieldErrors('end').length > 0"
+            />
+          </div>
+        </div>
+
+        <div class="form-field">
+          <label for="bk-weeks">Repeat weekly (All-or-Nothing)</label>
+          <select
+            id="bk-weeks"
+            name="recurringWeeks"
+            [ngModel]="recurringWeeks()"
+            (ngModelChange)="recurringWeeks.set($event)"
+          >
+            <option [value]="1">Single booking (1 week)</option>
+            <option [value]="2">Weekly for 2 weeks</option>
+            <option [value]="3">Weekly for 3 weeks</option>
+            <option [value]="4">Weekly for 4 weeks</option>
+          </select>
+        </div>
+
+        <fieldset class="equipment-fieldset">
+          <legend>Required equipment</legend>
+          <div class="checkbox-row">
+            @for (eq of equipmentList; track eq.value) {
+              <label class="checkbox-label">
+                <input
+                  type="checkbox"
+                  [checked]="hasNeed(eq.value)"
+                  (change)="toggleNeed(eq.value)"
+                />
+                <span>{{ eq.label }}</span>
+              </label>
+            }
+          </div>
+        </fieldset>
+
+        @if ((touched() || title().trim().length > 0) && validationErrors().length > 0) {
+          <div class="validation-summary" role="alert" aria-live="polite">
+            <strong>Validation issues:</strong>
+            <ul>
+              @for (err of validationErrors(); track err.code + (err.field ?? '')) {
+                <li>{{ err.message }}</li>
+              }
+            </ul>
+          </div>
+        }
+
+        @if (!recurringCheck().ok) {
+          <div class="validation-summary" role="alert" aria-live="polite">
+            <strong>Recurring conflict (all-or-nothing — none created):</strong>
+            <ul>
+              @for (fw of recurringCheck().failedWeeks; track fw.weekIndex) {
+                <li>
+                  Week {{ fw.weekIndex }} ({{ fw.date }}):
+                  {{ fw.errors[0]?.message ?? 'Unavailable' }}
+                </li>
+              }
+            </ul>
+          </div>
+        }
+
+        @if (liveSuggestions().length > 0) {
+          <div class="suggestions-box" aria-label="Live slot suggestions">
+            <strong>Suggested available slots:</strong>
+            <div class="suggestion-chips">
+              @for (s of liveSuggestions(); track s.roomId + s.start.toISOString()) {
+                <button type="button" class="btn suggestion-chip" (click)="applySuggestion(s)">
+                  {{ formatSuggestionLabel(s) }}
+                </button>
+              }
+            </div>
+          </div>
+        }
+
+        @if (store.error(); as apiError) {
+          <div class="api-error-box" role="alert">
+            <strong>Unable to save booking:</strong> {{ apiError.message }}
+          </div>
+        }
+
+        <footer class="drawer-footer">
+          <button
+            type="button"
+            class="btn"
+            [disabled]="store.submitting()"
+            (click)="closed.emit()"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            class="btn btn-primary"
+            [disabled]="store.submitting() || (touched() && !isValid())"
+          >
+            {{ store.submitting() ? 'Booking...' : 'Confirm Booking' }}
+          </button>
+        </footer>
+      </form>
+    </aside>
+  </div>
+}

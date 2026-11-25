@@ -1,0 +1,88 @@
+@if (store.conflictDetails(); as details) {
+  <div class="dialog-backdrop" (click)="!store.submitting() && close()">
+    <div
+      class="dialog-card"
+      appDialogFocus
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby="conflict-title"
+      aria-describedby="conflict-desc"
+      (click)="$event.stopPropagation()"
+    >
+      <header class="dialog-header">
+        <h2 id="conflict-title">Time Slot Already Booked</h2>
+        <button
+          type="button"
+          class="btn"
+          aria-label="Close conflict dialog"
+          [disabled]="store.submitting()"
+          (click)="close()"
+        >
+          ✕
+        </button>
+      </header>
+
+      <p id="conflict-desc" class="dialog-intro">
+        Another employee reserved this room (or its 15-minute buffer) just before your request
+        completed. Please choose an available alternative slot below.
+      </p>
+
+      <section class="conflicts-box" aria-label="Conflicting reservations">
+        <h3>Conflicting reservation</h3>
+        <ul>
+          @for (c of details.conflicts; track c.id) {
+            <li>
+              <strong>{{ c.title }}</strong> — booked by <strong>{{ c.userId }}</strong> in
+              {{ getRoomName(c.roomId) }} ({{ formatCairoRange(c.start, c.end) }})
+            </li>
+          }
+        </ul>
+      </section>
+
+      <section class="suggestions-section" aria-label="Suggested alternative slots">
+        <h3>Suggested alternatives</h3>
+        @if (store.suggestedSlots().length === 0) {
+          <p class="no-suggestions">
+            No alternative slots are available within the next few working days for these requirements.
+          </p>
+        } @else {
+          <div class="suggestions-list" role="radiogroup" aria-label="Alternative slots">
+            @for (slot of store.suggestedSlots().slice(0, 3); track slot.roomId + slot.start.toISOString()) {
+              <button
+                type="button"
+                role="radio"
+                class="suggestion-option"
+                [class.selected]="isSelected(slot)"
+                [attr.aria-checked]="isSelected(slot)"
+                (click)="selectSuggestion(slot)"
+              >
+                <strong>{{ getRoomName(slot.roomId) }}</strong>
+                <span>{{ formatCairoRange(slot.start, slot.end) }}</span>
+              </button>
+            }
+          </div>
+        }
+      </section>
+
+      <footer class="dialog-footer">
+        <button
+          type="button"
+          class="btn"
+          [disabled]="store.submitting()"
+          (click)="close()"
+        >
+          Dismiss
+        </button>
+        <button
+          type="button"
+          class="btn btn-primary"
+          [disabled]="!selectedSuggestion() || store.submitting()"
+          (click)="bookSelectedAlternative()"
+        >
+          {{ store.submitting() ? 'Booking...' : 'Book Selected Alternative' }}
+        </button>
+      </footer>
+    </div>
+  </div>
+}
+
