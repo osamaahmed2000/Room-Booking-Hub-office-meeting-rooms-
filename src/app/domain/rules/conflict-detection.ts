@@ -2,8 +2,20 @@ import {
   Booking,
   BookingRequest,
   DEFAULT_OFFICE_POLICY,
-} from '../models/booking.types';
-import { parseInstantInput, parseIsoInstant } from '../utils/timezone';
+  OfficePolicy,
+  Room,
+} from "../models/booking.types";
+import { parseInstantInput, parseIsoInstant } from "../utils/timezone";
+
+/**
+ * Returns the required buffer in minutes for a room.
+ */
+export function getBufferMins(
+  _room: Room,
+  policy: OfficePolicy = DEFAULT_OFFICE_POLICY,
+): number {
+  return policy.bufferMinutes;
+}
 
 /**
  * Deduplicates bookings by stable `id` (last occurrence wins if duplicated).
@@ -37,7 +49,7 @@ export function findConflicts(
   const conflicts: Booking[] = [];
 
   for (const item of deduped) {
-    if (item.status === 'cancelled') continue;
+    if (item.status === "cancelled") continue;
     if (item.roomId !== req.roomId) continue;
     if (req.editingBookingId && item.id === req.editingBookingId) continue;
 

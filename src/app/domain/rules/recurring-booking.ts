@@ -139,3 +139,5 @@ export function validateRecurringBooking(
   };
 }
 
+export const validateRecurring = validateRecurringBooking;
+

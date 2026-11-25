@@ -6,13 +6,21 @@ import {
   OfficePolicy,
   Room,
   ValidationResult,
+  WorkingHoursWindow,
 } from '../models/booking.types';
 import {
   getZonedDateTimeParts,
   parseInstantInput,
   parseIsoInstant,
 } from '../utils/timezone';
-import { deduplicateBookings, findConflicts } from './conflict-detection';
+import { deduplicateBookings, findConflicts, getBufferMins } from './conflict-detection';
+
+export function getWorkingWindow(
+  weekdayIndex: number,
+  policy: OfficePolicy = DEFAULT_OFFICE_POLICY,
+): WorkingHoursWindow | undefined {
+  return policy.dayHours[weekdayIndex];
+}
 
 /**
  * Validates a booking request against all business rules in strict precedence order:
@@ -118,7 +126,7 @@ export function validateBooking(
   // 3. Non-working day & 4. Outside working hours / crossing midnight
   const startLocal = getZonedDateTimeParts(startMs, policy.timezone);
   const endLocal = getZonedDateTimeParts(endMs, policy.timezone);
-  const hoursWindow = policy.dayHours[startLocal.weekdayIndex];
+  const hoursWindow = getWorkingWindow(startLocal.weekdayIndex, policy);
 
   if (!hoursWindow) {
     errors.push({
@@ -216,7 +224,7 @@ export function validateBooking(
 
   // 9. Same-room conflict and buffer
   if (room && room.id === req.roomId) {
-    const conflicts = findConflicts(req, existing, policy.bufferMinutes);
+    const conflicts = findConflicts(req, existing, getBufferMins(room, policy));
     if (conflicts.length > 0) {
       errors.push({
         code: 'ROOM_CONFLICT',

@@ -371,19 +371,34 @@ describe('BookingHubStore', () => {
     expect(store.bookings().map((b) => b.id)).toEqual(['bk-nov26']);
   });
 
-  it('supports 10s Undo cancellation and restores booking when undone', async () => {
-    const { store } = setup();
-    await store.initialize();
+  it('supports 10s Undo cancellation with fake timers and commits DELETE after 10s if not undone', async () => {
+    vi.useFakeTimers();
+    try {
+      const { store, gateway } = setup();
+      await store.initialize();
+      const cancelSpy = vi.spyOn(gateway, 'cancelBooking');
 
-    expect(store.myBookings().some((b) => b.id === 'bk-seed-2')).toBe(true);
-    store.requestCancelWithUndo('bk-seed-2', 10_000);
+      expect(store.myBookings().some((b) => b.id === 'bk-seed-2')).toBe(true);
+      store.requestCancelWithUndo('bk-seed-2', 10_000);
 
-    expect(store.myBookings().some((b) => b.id === 'bk-seed-2')).toBe(false);
-    expect(store.pendingUndoCancellations()).toHaveLength(1);
+      expect(store.myBookings().some((b) => b.id === 'bk-seed-2')).toBe(false);
+      expect(store.pendingUndoCancellations()).toHaveLength(1);
+      expect(cancelSpy).not.toHaveBeenCalled();
 
-    store.undoPendingCancel('bk-seed-2');
-    expect(store.myBookings().some((b) => b.id === 'bk-seed-2')).toBe(true);
-    expect(store.pendingUndoCancellations()).toHaveLength(0);
+      // Undo before 10s -> restores without calling server DELETE
+      store.undoPendingCancel('bk-seed-2');
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(store.myBookings().some((b) => b.id === 'bk-seed-2')).toBe(true);
+      expect(cancelSpy).not.toHaveBeenCalled();
+
+      // Now cancel and let 10s expire -> commits server DELETE
+      store.requestCancelWithUndo('bk-seed-2', 10_000);
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(cancelSpy).toHaveBeenCalledWith('bk-seed-2');
+      expect(store.pendingUndoCancellations()).toHaveLength(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('creates 4-week recurring bookings all-or-nothing and rolls back if any week fails', async () => {
