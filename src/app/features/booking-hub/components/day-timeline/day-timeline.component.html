@@ -1,0 +1,177 @@
+<section class="timeline-page" aria-labelledby="schedule-heading">
+  <header class="page-header">
+    <div>
+      <h1 id="schedule-heading">Meeting Room Schedule</h1>
+      <p class="subtitle">All times shown in Cairo office time (Africa/Cairo, 08:00–18:00 Sun–Thu · 08:00–13:00 Fri)</p>
+    </div>
+
+    <div class="header-actions">
+      <div class="date-controls" role="group" aria-label="Schedule date navigation">
+        <button
+          type="button"
+          class="btn"
+          aria-label="Previous day"
+          (click)="previousDay()"
+        >
+          ‹ Prev
+        </button>
+        <label for="timeline-date" class="sr-only">Schedule date</label>
+        <input
+          id="timeline-date"
+          type="date"
+          class="date-input"
+          [value]="store.selectedDate()"
+          (change)="onDateChange($event)"
+        />
+        <button
+          type="button"
+          class="btn"
+          aria-label="Next day"
+          (click)="nextDay()"
+        >
+          Next ›
+        </button>
+        <button type="button" class="btn" (click)="goToToday()">Today</button>
+      </div>
+
+      <button
+        type="button"
+        class="btn btn-primary"
+        [disabled]="!store.canCreateBooking()"
+        (click)="bookRoomRequested.emit({})"
+      >
+        + Book a Room
+      </button>
+    </div>
+  </header>
+
+  <app-room-filters />
+
+  @if (store.loading() && store.rooms().length === 0) {
+    <div class="skeleton-list" aria-busy="true" aria-label="Loading schedule">
+      @for (item of [1, 2, 3]; track item) {
+        <div class="skeleton-row"></div>
+      }
+    </div>
+  } @else if (store.roomTimelineData().length === 0) {
+    <div class="empty-card">
+      <h2>No rooms match your filters</h2>
+      <p>Try clearing floor, capacity, or equipment filters to view available rooms.</p>
+    </div>
+  } @else {
+    <!-- Desktop Timeline Grid -->
+    <div class="timeline-card desktop-timeline" role="region" aria-label="Room schedule grid">
+      <div class="timeline-ruler">
+        <div class="room-col-header">Room</div>
+        <div class="hours-track">
+          @for (h of hours; track h) {
+            <div class="hour-tick">
+              <span>{{ formatHourLabel(h) }}</span>
+            </div>
+          }
+        </div>
+      </div>
+
+      @for (entry of timelineRows(); track entry.room.id) {
+        <div class="timeline-row">
+          <div class="room-meta">
+            <div class="room-title-row">
+              <strong class="room-name">{{ entry.room.name }}</strong>
+              <span class="badge">Fl {{ entry.room.floor }}</span>
+            </div>
+            <div class="room-specs">
+              <span>{{ entry.room.capacity }} seats</span>
+              @if (entry.room.equipment.length > 0) {
+                <span class="equip-list">{{ entry.room.equipment.join(' · ') }}</span>
+              }
+            </div>
+            <button
+              type="button"
+              class="quick-book-link"
+              [disabled]="!store.canCreateBooking()"
+              (click)="bookRoomRequested.emit({ roomId: entry.room.id })"
+            >
+              Book room
+            </button>
+          </div>
+
+          <div class="bookings-track">
+            <div class="grid-lines" aria-hidden="true">
+              @for (h of hours.slice(0, -1); track h) {
+                <div class="grid-cell"></div>
+              }
+            </div>
+
+            @for (block of entry.blocks; track block.booking.id) {
+              <button
+                type="button"
+                class="booking-block"
+                [class.own-booking]="block.isOwn"
+                [style.left.%]="block.leftPercent"
+                [style.width.%]="block.widthPercent"
+                (click)="bookingSelected.emit(block.booking)"
+                [attr.aria-label]="block.booking.title + ', ' + block.timeRangeLabel"
+              >
+                <span class="booking-title">{{ block.booking.title }}</span>
+                <span class="booking-time">
+                  {{ block.timeRangeLabel }}
+                  @if (block.isOwn) {
+                    · You
+                  }
+                </span>
+              </button>
+            }
+          </div>
+        </div>
+      }
+    </div>
+
+    <!-- Mobile Card Fallback -->
+    <div class="mobile-timeline" aria-label="Room schedule list">
+      @for (entry of timelineRows(); track entry.room.id) {
+        <article class="mobile-room-card">
+          <header class="mobile-room-header">
+            <div>
+              <h2>{{ entry.room.name }}</h2>
+              <p>Floor {{ entry.room.floor }} · {{ entry.room.capacity }} seats</p>
+            </div>
+            <button
+              type="button"
+              class="btn"
+              [disabled]="!store.canCreateBooking()"
+              (click)="bookRoomRequested.emit({ roomId: entry.room.id })"
+            >
+              Book
+            </button>
+          </header>
+
+          @if (entry.blocks.length === 0) {
+            <p class="no-bookings-note">No confirmed bookings for this date.</p>
+          } @else {
+            <ul class="mobile-bookings-list">
+              @for (block of entry.blocks; track block.booking.id) {
+                <li>
+                  <button
+                    type="button"
+                    class="mobile-booking-item"
+                    [class.own-booking]="block.isOwn"
+                    (click)="bookingSelected.emit(block.booking)"
+                  >
+                    <strong>{{ block.booking.title }}</strong>
+                    <span>
+                      {{ block.timeRangeLabel }}
+                      @if (block.isOwn) {
+                        · Your booking
+                      }
+                    </span>
+                  </button>
+                </li>
+              }
+            </ul>
+          }
+        </article>
+      }
+    </div>
+  }
+</section>
+

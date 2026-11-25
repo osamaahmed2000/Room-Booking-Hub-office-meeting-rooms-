@@ -1,0 +1,105 @@
+<section class="my-bookings-page" aria-labelledby="my-bookings-heading">
+  <header class="page-header">
+    <div>
+      <h1 id="my-bookings-heading">My Bookings</h1>
+      <p class="subtitle">
+        Active reservations for {{ store.currentUserId() }} ·
+        {{ store.bookingCounts().myActiveOnSelectedDate }} / {{ store.bookingCounts().quotaLimit }}
+        used on {{ store.selectedDate() }}
+      </p>
+    </div>
+
+    <button
+      type="button"
+      class="btn btn-primary"
+      [disabled]="!store.canCreateBooking()"
+      (click)="bookRoomRequested.emit()"
+    >
+      + Book a Room
+    </button>
+  </header>
+
+  @if (store.loading() && store.bookings().length === 0) {
+    <div class="skeleton-stack" aria-busy="true" aria-label="Loading your bookings">
+      <div class="skeleton-card"></div>
+      <div class="skeleton-card"></div>
+    </div>
+  } @else if (store.myBookings().length === 0) {
+    <div class="empty-card">
+      <h2>No active bookings</h2>
+      <p>You have no upcoming confirmed reservations in the current schedule.</p>
+      <button
+        type="button"
+        class="btn btn-primary"
+        [disabled]="!store.canCreateBooking()"
+        (click)="bookRoomRequested.emit()"
+      >
+        Book a Room
+      </button>
+    </div>
+  } @else {
+    <div class="bookings-grid">
+      @for (booking of store.myBookings(); track booking.id) {
+        <article class="booking-card">
+          <div class="booking-main">
+            <div class="booking-top">
+              <h2>{{ booking.title }}</h2>
+              <span class="badge status-confirmed">{{ booking.status }}</span>
+            </div>
+            <dl class="booking-meta">
+              <div>
+                <dt>Room</dt>
+                <dd>{{ getRoomName(booking.roomId) }}</dd>
+              </div>
+              <div>
+                <dt>Date</dt>
+                <dd>{{ formatDate(booking.start) }}</dd>
+              </div>
+              <div>
+                <dt>Time (Cairo)</dt>
+                <dd>{{ formatTimeRange(booking) }}</dd>
+              </div>
+              <div>
+                <dt>Attendees</dt>
+                <dd>{{ booking.attendees }}</dd>
+              </div>
+            </dl>
+          </div>
+
+          @if (canCancel(booking)) {
+            <div class="booking-actions">
+              @if (confirmingId() === booking.id) {
+                <span class="confirm-prompt">Cancel this booking?</span>
+                <button
+                  type="button"
+                  class="btn btn-danger"
+                  [disabled]="isCancelling(booking.id)"
+                  (click)="confirmCancel(booking.id)"
+                >
+                  {{ isCancelling(booking.id) ? 'Cancelling...' : 'Confirm Cancel' }}
+                </button>
+                <button
+                  type="button"
+                  class="btn"
+                  [disabled]="isCancelling(booking.id)"
+                  (click)="dismissConfirmation()"
+                >
+                  Keep
+                </button>
+              } @else {
+                <button
+                  type="button"
+                  class="btn btn-danger"
+                  (click)="requestCancelConfirmation(booking.id)"
+                >
+                  Cancel Booking
+                </button>
+              }
+            </div>
+          }
+        </article>
+      }
+    </div>
+  }
+</section>
+
