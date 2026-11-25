@@ -1,19 +1,30 @@
 # AI Usage Log
 
 ## Tools Used
-- **Antigravity AI Coding Assistant** (used inside the IDE for scaffolding, pure TypeScript domain implementation, Angular Signals store, standalone UI components, and Vitest test suites).
+- **Antigravity AI Coding Assistant** (used inside the IDE for scaffolding, pure TypeScript domain logic, Angular Signals store, standalone UI components, and Vitest test suites).
 
 ## How I Used AI
-1. **Repository Setup & Architecture**: Used AI to scaffold the Angular 21 strict workspace, configure Vitest + `jsdom`, and separate the app into `domain/` (framework-free), `data/`, `infrastructure/mock-server/`, `state/`, and `features/`.
-2. **Domain Layer (TDD)**: Wrote failing Vitest tests first for `validateBooking`, `findConflicts`, `suggestSlots`, `validateRecurringBooking`, and `Africa/Cairo` DST edge cases, then generated and refined the pure TypeScript implementation.
-3. **Mock Server Reconstruction**: Because the assessment's `mock-server.ts` was not included in my materials, I had AI reconstruct a deterministic in-memory `MockServer` behind `BookingGateway` / `LocalMockGateway` with atomic `409` checks and fault injection.
-4. **Store, UI & Day-2 Changes**: Used AI to build `BookingHubStore` (optimistic booking + rollback, 10s Undo cancellation, event reconciliation) and standalone UI components (`DayTimeline`, `BookingDrawer`, `MyBookings`, `ConflictDialog`, `RoomFilters`, `DialogFocusDirective`).
+1. **Architecture & Scaffolding**: Used AI to structure the Angular 21 strict workspace, configure Vitest + `jsdom`, and isolate `domain/` (pure TypeScript) from `data/`, `infrastructure/mock-server/`, `state/`, and `features/`.
+2. **Mock Server Reconstruction**: Because the assessment's `mock-server.ts` was not included in my materials, I had AI reconstruct a deterministic in-memory `MockServer` behind `BookingGateway` / `LocalMockGateway` with atomic `409` checks and fault injection.
+3. **Store, UI & Day-2 Features**: Used AI to implement `BookingHubStore` (optimistic booking + rollback, 10s Undo cancellation, event reconciliation) and standalone UI components (`DayTimeline`, `BookingDrawer`, `MyBookings`, `ConflictDialog`, `RoomFilters`, `DialogFocusDirective`).
+4. **Git History Note**: The main implementation was built first and then committed into logical layer-by-layer commits; subsequent fixes (such as `package.json`, `test-setup.ts`, UI recurring test, and this log) were committed incrementally as they were made.
 
-## Where AI Was Wrong (and How I Fixed/Caught It)
-1. **Duplicate API records in Store (`loadBookings`)**: AI implemented `deduplicateBookings()` in the domain layer, but forgot to apply it when storing `GET /bookings` snapshots in `BookingHubStore.loadBookings()`. Dirty API responses with duplicate IDs would have double-counted active bookings and daily quota. Caught during the QA audit and fixed with `deduplicateBookings()` + a regression test.
-2. **Spurious `needsResync` on HTTP mutation acknowledgments**: In `BookingHubStore.createBooking` and `cancelBooking`, AI initially fed a synthetic `ack-...` event into `BookingEventReconciler.apply()` with the same `seq` that `MockServer` had already emitted on `events$`, causing `needsResync = true` on every mutation. Fixed by adding `BookingEventReconciler.reconcileMutation()`.
-3. **Slow `suggestSlots()` on 60 rooms × 30 days**: AI's first `suggestSlots()` implementation re-parsed and deduplicated all 1,800 bookings inside the inner room/slot loop, taking **2,847 ms** in `performance.spec.ts`. After indexing intervals by `roomId`, pre-filtering eligible rooms, and adding an early-exit bound, the benchmark dropped to **63–73 ms**.
-4. **Offline `ng build` & toolchain mismatches**: AI initially added a Google Fonts `<link>` in `src/index.html` (which broke offline `ng build` font inlining) and installed incompatible `typescript@7` / `vitest@5` versions with `@angular/build@21`. Both were caught by running `ng build` and `vitest run` and fixed directly.
+## Where AI Was Wrong (Before / After)
+1. **Duplicate API records in `BookingHubStore.loadBookings()`**:
+   - *Before*: `deduplicateBookings()` was used in `domain/`, but `loadBookings()` stored `res.value.bookings` directly without deduplicating, which allowed duplicate IDs from a dirty API snapshot to double-count in `activeBookings()` and daily quota.
+   - *After*: Applied `deduplicateBookings(res.value.bookings)` inside `loadBookings()` before updating state and added a regression test in `booking-hub.integration.spec.ts`.
+2. **Spurious `needsResync` on HTTP mutation acknowledgments**:
+   - *Before*: `createBooking()` and `cancelBooking()` synthesized an `ack-...` `BookingEvent` and passed it to `BookingEventReconciler.apply()` with the same `seq` already emitted by `MockServer`, causing `needsResync = true` on every mutation.
+   - *After*: Added `BookingEventReconciler.reconcileMutation()` so HTTP acknowledgments reconcile state without triggering false gap resyncs.
+3. **Slow `suggestSlots()` on 60 rooms × 30 days**:
+   - *Before*: `suggestSlots()` scanned and re-parsed all bookings inside the inner room/slot loop, making the 60 rooms × 30 days benchmark fail its `< 500 ms` threshold.
+   - *After*: Pre-indexed active intervals by `roomId`, pre-filtered eligible rooms, and added an early-exit bound so the benchmark passes well under `500 ms` (~`60 ms`).
+4. **Offline `ng build` & `package.json` dependency drift**:
+   - *Before*: `src/index.html` included an external Google Fonts `<link>` that failed offline `ng build` font inlining, and `package.json` was missing the Angular 21 dependencies present in `package-lock.json` (which would break `npm ci`).
+   - *After*: Removed the external font link and aligned `package.json` with `package-lock.json`.
 
-## Verification & Ownership
-- Every requirement, edge case (Cairo DST transitions, 15-minute buffer, quota, 409 rollback, 10s Undo, Day-2 Friday half-day + 4-week recurring), and build/test command (`npm run typecheck`, `npm run build`, `npm test` — 12 files, 60 tests) was executed and verified locally.
+## Decisions I Made Myself
+- **Minimum 15-minute booking duration**: The brief specified a 2-hour maximum without a minimum; I chose a 15-minute minimum matching `slotStepMinutes` and buffer granularity.
+- **Validation precedence**: Ordered checks from structural/timestamp parsing → interval/duration → working day/hours → past → room/capacity/equipment → daily quota → room conflict, returning all independent errors while short-circuiting on unparseable timestamps.
+- **Cairo local start date for daily quota**: Assigned bookings to their `Africa/Cairo` start date rather than UTC date so late-evening UTC timestamps don't shift days.
+- **Kept `MockServer` isolated behind `BookingGateway`**: Ensured swapping to a real HTTP/WebSocket backend only requires replacing `BOOKING_GATEWAY` in `app.config.ts`.
