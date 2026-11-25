@@ -5,8 +5,10 @@ import {
   platformBrowserTesting,
 } from '@angular/platform-browser/testing';
 
-getTestBed().initTestEnvironment(
-  BrowserTestingModule,
-  platformBrowserTesting(),
-);
-
+const testBed = getTestBed();
+if (!testBed.platform) {
+  testBed.initTestEnvironment(
+    BrowserTestingModule,
+    platformBrowserTesting(),
+  );
+}
